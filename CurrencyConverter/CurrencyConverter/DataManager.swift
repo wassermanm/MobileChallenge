@@ -15,27 +15,24 @@ class DataManager {
     
     fileprivate var dataCache = Dictionary<String,DataCache>()
     
-    func getCurrencyCodes( _ completion: @escaping (_ success: Bool, _ message: Array<String>) -> ()) {
+    func getCurrencyCodes( _ completion: @escaping (_ success: Bool, _ message: Array<String>, _ errorMessage: String) -> ()) {
         get(clientURLRequest("latest")) { (success, object) in
             DispatchQueue.main.async(execute: { () -> Void in
                 var rates = Array<String>()
-                let errorMessage = "there was an error retrieving currency codes"
+                let errorMessage = "There was an error retrieving currency codes"
                 if success {
                     guard let dict = object as? [String: Any] else {
-                        rates.append(errorMessage)
-                        completion(false, rates)
+                        completion(false, rates, errorMessage)
                         return
                     }
                    guard let base = dict["base"] as? String else {
-                        rates.append(errorMessage)
-                        completion(false, rates)
+                        completion(false, rates, errorMessage)
                         return
                     }
                     rates.append(base)
                     
                     guard let exchangeRates = dict["rates"] as? [String:Any] else {
-                        rates.append(errorMessage)
-                        completion(false, rates)
+                        completion(false, rates, errorMessage)
                         return
                     }
                     
@@ -43,10 +40,11 @@ class DataManager {
                         rates.append(rate.key)
                     }
                     
-                    completion(true, rates)
+                    completion(true, rates, "")
+                    return
                 } else {
-                    rates.append(errorMessage)
-                    completion(false, rates)
+                    completion(false, rates, errorMessage)
+                    return
                 }
             })
         }
@@ -66,7 +64,7 @@ class DataManager {
         get(clientURLRequest(requestURLWithParams)) { (success, object) in
             DispatchQueue.main.async(execute: {[weak self] () -> Void in
                 var rates = Array<Rate>()
-                let errorMessage = "there was an error retrieving rates"
+                let errorMessage = "There was an error retrieving rates"
                 if success {
                     guard let dict = object as? [String: Any] else {
                         completion(false, rates, errorMessage)
@@ -128,11 +126,15 @@ class DataManager {
     
     fileprivate func dataTask(_ request: NSMutableURLRequest, method: String, completion: @escaping (_ success: Bool, _ object: AnyObject?) -> ()) {
         request.httpMethod = method
-        completion(true, nil)
         
-        let session = URLSession(configuration: URLSessionConfiguration.default)
-         
+        let sessionConfig = URLSessionConfiguration.default
+        sessionConfig.timeoutIntervalForRequest = 5.0;
+        let session = URLSession(configuration: sessionConfig)
+
          session.dataTask(with: request as URLRequest) { (data, response, error) -> Void in
+            if let _ = error {
+                completion(false, nil)
+            }
              if let data = data {
                 let json = try? JSONSerialization.jsonObject(with: data, options: [JSONSerialization.ReadingOptions.mutableContainers])
                 if let response = response as? HTTPURLResponse, 200...299 ~= response.statusCode {
@@ -142,6 +144,7 @@ class DataManager {
                 }
              } else {
                 print("NO DATA!")
+                completion(false, nil)
              }
          }.resume()
     }

@@ -10,6 +10,7 @@ import UIKit
 
 class ViewController: UIViewController, UIPickerViewDataSource, UIPickerViewDelegate, UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
 
+    @IBOutlet weak var activityIndicator: UIActivityIndicatorView!
     @IBOutlet weak var currencyAmountField: UITextField!
     @IBOutlet weak var selectCurrencyButton: UIButton!
     @IBOutlet weak var currencyPickerView: UIPickerView!
@@ -24,13 +25,19 @@ class ViewController: UIViewController, UIPickerViewDataSource, UIPickerViewDele
     fileprivate let sectionInsets = UIEdgeInsets(top: 50.0, left: 20.0, bottom: 50.0, right: 20.0)
     
     override func viewWillAppear(_ animated: Bool) {
+        self.activityIndicator.color = UIColor.black
         currencyPickerView.isHidden = true
         collectionViewTopConstraint.constant = 20
         
-        DataManager.sharedInstance.getCurrencyCodes({[weak self] (success, codes) in
+        self.addSpinner()
+        DataManager.sharedInstance.getCurrencyCodes({[weak self] (success, codes, err) in
             if success {
                 self?.pickerData = codes
                 self?.currencyPickerView.reloadAllComponents()
+                self?.removeSpinner()
+            } else {
+                self?.presentAlert(title: "Error", message: err)
+                self?.removeSpinner()
             }
         })
     }
@@ -100,6 +107,8 @@ class ViewController: UIViewController, UIPickerViewDataSource, UIPickerViewDele
             return
         }
         
+        self.addSpinner()
+        
         if let curr = currencyLabel.text, let amount = currencyAmountField.text {
             DataManager.sharedInstance.getRatesForCode(amount, curr, {[weak self](success, rates, err) in
                 if success {
@@ -111,7 +120,12 @@ class ViewController: UIViewController, UIPickerViewDataSource, UIPickerViewDele
                         }
                     }
                     self?.collectionView.reloadData()
+                    self?.removeSpinner()
+                } else {
+                    self?.presentAlert(title: "Error", message: err)
+                    self?.removeSpinner()
                 }
+                
             })
         }
         
@@ -154,6 +168,16 @@ class ViewController: UIViewController, UIPickerViewDataSource, UIPickerViewDele
     }
     
     //MARK: - Utility Methods
+    
+    private func addSpinner() {
+        self.activityIndicator.isHidden =  false
+        self.activityIndicator.startAnimating()
+    }
+    
+    private func removeSpinner() {
+        self.activityIndicator.isHidden =  true
+        self.activityIndicator.stopAnimating()
+    }
     
     @objc private func dismissKeyboard() {
         currencyAmountField.resignFirstResponder()
